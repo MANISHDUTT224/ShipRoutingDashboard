@@ -1,0 +1,36 @@
+.App {
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+.App-header {
+  background-color: #282c34;
+  padding: 20px;
+  color: white;
+}
+
+input-section, .map-section, .details-section {
+  display: flex;
+  justify-content: center;
+  margin: 20px;
+}
+
+.map-container {
+  width: 70%;
+  height: 400px;
+  border: 1px solid #ccc;
+}
+
+.route-input, .route-details, .alerts {
+  margin: 10px;
+  padding: 20px;
+  border: 1px solid #ddd;
+  background-color: #f9f9f9;
+  border-radius: 5px;
+}
+
+button {
+  padding: 10px 20px;
+  margin-top: 10px;
+  cursor: pointer;
+}
