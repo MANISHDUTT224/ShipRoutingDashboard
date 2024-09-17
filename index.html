@@ -1,11 +1,196 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Optimal Ship Routing Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ship Route Optimizer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        nav {
+            background-color: #003366;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+        }
+        footer {
+            background-color: #003366;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+        }
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        select, button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #003366;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #002244;
+        }
+        .spinner {
+            display: none;
+            margin: 20px auto;
+            text-align: center;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 5px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%; /* Position the tooltip */
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
 </head>
 <body>
-  <div id="root"></div>
+    <nav>
+        <h1>Ship Route Optimizer</h1>
+    </nav>
+
+    <div class="container">
+        <h2>Optimize Ship Route</h2>
+        <form id="route-form">
+            <div class="form-group">
+                <label for="start-port">Select Start Port</label>
+                <div class="tooltip">ⓘ
+                    <span class="tooltiptext">Select the starting point for your shipping route.</span>
+                </div>
+                <select id="start-port" required>
+                    <option value="" disabled selected>Select a port</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="end-port">Select End Port</label>
+                <div class="tooltip">ⓘ
+                    <span class="tooltiptext">Select the destination port for your shipping route.</span>
+                </div>
+                <select id="end-port" required>
+                    <option value="" disabled selected>Select a port</option>
+                </select>
+            </div>
+
+            <button type="submit">Calculate Optimal Route</button>
+        </form>
+
+        <div class="spinner">
+            <i class="fas fa-spinner fa-spin" style="font-size: 24px;"></i>
+            <p>Calculating route, please wait...</p>
+        </div>
+
+        <div id="route-result">
+            <!-- Route image will be displayed here -->
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Ship Route Optimizer</p>
+    </footer>
+
+    <script>
+        // Sample ports list
+        const ports = [
+            "Shanghai", "Singapore", "Rotterdam", "Hong Kong", "Los Angeles",
+            "Antwerp", "Hamburg", "Dubai", "Busan", "New York", "Tokyo",
+            "Santos", "Mumbai", "Jebel Ali", "Port Klang", "Felixstowe",
+            "Tanjung Pelepas", "Gioia Tauro", "Manzanillo", "Piraeus",
+            "Long Beach", "Valencia", "Algeciras", "Le Havre", "Houston",
+            "Cebu", "Colombo", "Guangzhou", "Durban", "Port Said"
+        ];
+
+        // Populate dropdown menus
+        const startPortDropdown = document.getElementById('start-port');
+        const endPortDropdown = document.getElementById('end-port');
+
+        ports.forEach(port => {
+            let option = document.createElement('option');
+            option.text = port;
+            option.value = port;
+            startPortDropdown.add(option.cloneNode(true));
+            endPortDropdown.add(option);
+        });
+
+        // Form submission handler
+        const form = document.getElementById('route-form');
+        const spinner = document.querySelector('.spinner');
+        const routeResult = document.getElementById('route-result');
+
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const startPort = startPortDropdown.value;
+            const endPort = endPortDropdown.value;
+
+            // Show spinner while waiting for the result
+            spinner.style.display = 'block';
+            routeResult.innerHTML = '';
+
+            // Simulate a backend API call to calculate the route
+            fetch('http://localhost:5000/calculate-route', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startPoint: startPort, endPoint: endPort })
+            })
+            .then(response => response.blob())
+            .then(imageBlob => {
+                // Hide spinner
+                spinner.style.display = 'none';
+
+                // Display the route image
+                const imgUrl = URL.createObjectURL(imageBlob);
+                routeResult.innerHTML = `<img src="${imgUrl}" alt="Optimal Route" style="width: 100%;">`;
+            })
+            .catch(error => {
+                spinner.style.display = 'none';
+                alert('An error occurred: ' + error.message);
+            });
+        });
+    </script>
 </body>
 </html>

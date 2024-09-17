@@ -1,35 +1,75 @@
-import random
-import numpy as np
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+import io
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from datetime import datetime, timedelta
+from flask import Flask, request, jsonify, send_file
+from flask_cors import CORS
+import numpy as np
+import random
+import requests
 
-# Constants and parameters
-GRID_SIZE = 50  # Size of our weather and routing grid
-TIME_STEPS = 20  # Number of time steps for weather prediction
-EPISODES = 1000  # Number of episodes for training
-EPSILON = 0.1  # Exploration rate
-ALPHA = 0.1  # Learning rate
-GAMMA = 0.9  # Discount factor
-SHIP_SPEED = 16  # knots
-FUEL_CONSUMPTION_RATE = 0.05  # tons per nautical mile
-MAX_WAVE_HEIGHT = 5.0  # meters
-MAX_WIND_SPEED = 20.0  # knots
+ORS_API_KEY = 'your_openrouteservice_api_key'
 
-# Flask app setup
-app = Flask(__name__)
-CORS(app)  # Enable CORS to allow frontend communication
+# Function to get real-world sea route between start and end points
+def get_real_route(start, end):
+    url = 'https://api.openrouteservice.org/v2/directions/driving-car'
+    headers = {
+        'Authorization': ORS_API_KEY,
+        'Content-Type': 'application/json'
+    }
+
+    body = {
+        "coordinates": [[start[1], start[0]], [end[1], end[0]]],
+        "profile": "driving-car",  # Change to sea-specific profile if available
+        "format": "geojson"
+    }
+
+    response = requests.post(url, json=body, headers=headers)
+
+    if response.status_code == 200:
+        route_data = response.json()
+        return route_data['features'][0]['geometry']['coordinates']  # GeoJSON format
+    else:
+        return None
+
+@app.route('/calculate-route', methods=['POST'])
+def calculate_route():
+    data = request.json
+    start_point = tuple(data['startPoint'])  # Example: [0, -50]
+    end_point = tuple(data['endPoint'])  # Example: [30, 30]
+
+    # Get real sea route using OSM or OpenRouteService
+    real_route = get_real_route(start_point, end_point)
+    
+    if real_route is not None:
+        return jsonify({'route': real_route})
+    else:
+        return jsonify({'error': 'Could not fetch real route'}), 500
+
+# Constants and parameters for the model
+GRID_SIZE = 50
+TIME_STEPS = 20
+EPISODES = 1000
+EPSILON = 0.1
+ALPHA = 0.1
+GAMMA = 0.9
+
+# Ship characteristics
+SHIP_SPEED = 16
+FUEL_CONSUMPTION_RATE = 0.05
+
+# Safety criteria
+MAX_WAVE_HEIGHT = 5.0
+MAX_WIND_SPEED = 20.0
+
 
 # Weather prediction model
 class WeatherModel:
     def __init__(self, grid_size, time_steps):
         self.grid_size = grid_size
         self.time_steps = time_steps
-        self.wave_heights = np.random.rand(grid_size, grid_size, time_steps) * 10  # 0-10m waves
-        self.wind_speeds = np.random.rand(grid_size, grid_size, time_steps) * 30  # 0-30 knots wind
+        self.wave_heights = np.random.rand(grid_size, grid_size, time_steps) * 10
+        self.wind_speeds = np.random.rand(grid_size, grid_size, time_steps) * 30
 
     def predict(self, lat, lon, time):
         x = int((lon + 180) * self.grid_size / 360) % self.grid_size
@@ -46,11 +86,13 @@ class WeatherModel:
         self.wind_speeds[:, :, :-1] = self.wind_speeds[:, :, 1:]
         self.wind_speeds[:, :, -1] = np.random.rand(self.grid_size, self.grid_size) * 30
 
+
 weather_model = WeatherModel(GRID_SIZE, TIME_STEPS)
+
 
 # Helper functions
 def calculate_distance(point1, point2):
-    R = 6371.0  # Earth's radius in km
+    R = 6371.0
     lat1, lon1 = np.radians(point1)
     lat2, lon2 = np.radians(point2)
     dlat = lat2 - lat1
@@ -59,13 +101,16 @@ def calculate_distance(point1, point2):
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     return R * c
 
+
 def get_state(position):
     return (int(position[0] + 90) * GRID_SIZE + int(position[1] + 180)) % (GRID_SIZE * GRID_SIZE)
+
 
 def get_position(state):
     lat = (state // GRID_SIZE) - 90
     lon = (state % GRID_SIZE) - 180
     return (lat, lon)
+
 
 def get_reward(position, time):
     weather = weather_model.predict(position[0], position[1], time)
@@ -76,9 +121,10 @@ def get_reward(position, time):
         safety_penalty += 1000
     return -safety_penalty - FUEL_CONSUMPTION_RATE
 
+
 # Q-learning algorithm
 def q_learning(start, end, episodes):
-    q_table = np.zeros((GRID_SIZE * GRID_SIZE, 8))  # 8 possible actions (N, NE, E, SE, S, SW, W, NW)
+    q_table = np.zeros((GRID_SIZE * GRID_SIZE, 8))
 
     for episode in range(episodes):
         state = get_state(start)
@@ -115,7 +161,7 @@ def q_learning(start, end, episodes):
 
     return q_table
 
-# Route optimization function
+
 def get_optimal_route(q_table, start, end):
     route = [start]
     state = get_state(start)
@@ -134,19 +180,53 @@ def get_optimal_route(q_table, start, end):
 
     return route
 
-# Flask endpoint to handle route calculation
+
+# Route plotting function
+def plot_route(route):
+    fig = plt.figure(figsize=(10, 6))
+    ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+    ax.add_feature(cfeature.LAND)
+    ax.add_feature(cfeature.OCEAN)
+    ax.add_feature(cfeature.COASTLINE)
+    ax.add_feature(cfeature.BORDERS, linestyle=':')
+
+    lons, lats = zip(*route)
+    ax.plot(lons, lats, 'ro-', transform=ccrs.Geodetic(), linewidth=2, markersize=5)
+
+    ax.set_global()
+    ax.gridlines(draw_labels=True)
+    ax.set_title("Optimal Ship Route")
+
+    # Save the plot to a BytesIO object and return it
+    img = io.BytesIO()
+    plt.savefig(img, format='png')
+    img.seek(0)
+    return img
+
+
+# Flask backend
+app = Flask(__name__)
+CORS(app)  # Enable CORS for cross-origin requests
+
+
+# Endpoint for calculating optimal route and returning map image
 @app.route('/calculate-route', methods=['POST'])
 def calculate_route():
     data = request.json
-    start_point = tuple(data['startPoint'])
-    end_point = tuple(data['endPoint'])
+    start_point = tuple(data['startPoint'])  # Example: [0, -50]
+    end_point = tuple(data['endPoint'])  # Example: [30, 30]
+
+    # Train Q-learning algorithm
     q_table = q_learning(start_point, end_point, EPISODES)
+
+    # Get optimal route
     optimal_route = get_optimal_route(q_table, start_point, end_point)
 
-    return jsonify({
-        'optimalRoute': optimal_route
-    })
+    # Plot the route and return the image
+    img = plot_route(optimal_route)
 
-# Run Flask app
+    return send_file(img, mimetype='image/png')
+
+
 if __name__ == '__main__':
     app.run(debug=True)

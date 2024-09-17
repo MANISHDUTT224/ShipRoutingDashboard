@@ -1,12 +1,15 @@
 import React from 'react';
 
-function RouteDetails({ routeDetails }) {
+function RouteDetails({ details }) {
   return (
     <div className="route-details">
       <h2>Route Details</h2>
-      <p>Distance: {routeDetails.distance?.toFixed(2)} nautical miles</p>
-      <p>ETA: {routeDetails.eta?.toFixed(2)} hours</p>
-      <p>Fuel Consumption: {routeDetails.fuelConsumption?.toFixed(2)} tons</p>
+      <p><strong>Start Port:</strong> {details.start}</p>
+      <p><strong>Destination:</strong> {details.destination}</p>
+      <p><strong>Speed:</strong> {details.speed} knots</p>
+      <p><strong>Distance:</strong> {details.distance} nautical miles</p>
+      <p><strong>ETA:</strong> {details.eta}</p>
+      <p><strong>Fuel Consumption:</strong> {details.fuel}</p>
     </div>
   );
 }
